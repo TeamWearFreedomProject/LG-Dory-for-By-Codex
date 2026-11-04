@@ -63,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/patch_legacy_pmbootstrap.py pmbootstrap
-          git -C pmbootstrap diff -- pmb/chroot/apk_static.py pmb/helpers/apk.py \
+          git -C pmbootstrap diff -- pmb/chroot/apk_static.py pmb/helpers/apk.py pmb/build/other.py \
             > "$PMB_OUT/report/pmbootstrap-compat.patch"
       - name: Set test USB product ID
         env:

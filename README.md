@@ -2,7 +2,7 @@
 
 The [2022 ARMHF build workflow](.github/workflows/legacy-dory-2022.yml) uses
 pinned postmarketOS sources from December 2022. It applies a narrow
-apk 3 output compatibility fixes to pmbootstrap while retaining its
+apk 3 output and current `abuild.conf` compatibility fixes to pmbootstrap while retaining its
 package-signature, version, and command exit checks. It keeps the original dory
 Linux 3.10/GCC 6 port and builds a minimal image with SSH enabled. GitHub
 Actions uploads compressed `boot.img` and `lg-dory.img` plus logs and checksums.

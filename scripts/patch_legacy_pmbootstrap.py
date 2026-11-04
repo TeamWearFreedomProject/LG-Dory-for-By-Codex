@@ -20,6 +20,13 @@ NEW_PROGRESS = (
     "    except ValueError:\n"
     "        return 0\n"
 )
+OLD_ABUILD = '    raise RuntimeError("Could not find " + prefix + " line in " + path)'
+NEW_ABUILD = '''    if verify:
+        raise RuntimeError("Failed to configure abuild: " + path)
+    pmb.chroot.root(args, ["sed", "-i", "-e",
+                           f"$a\\\\{prefix}{args.jobs}", "/etc/abuild.conf"],
+                    suffix)
+    configure_abuild(args, suffix, True)'''
 
 
 def apply(root: Path) -> None:
@@ -31,8 +38,13 @@ def apply(root: Path) -> None:
     progress = progress_source.read_text()
     if progress.count(OLD_PROGRESS) != 1:
         raise ValueError("Expected pmbootstrap 1.50.1 progress parser was not found once")
+    abuild_source = root / "pmb/build/other.py"
+    abuild = abuild_source.read_text()
+    if abuild.count(OLD_ABUILD) != 1:
+        raise ValueError("Expected pmbootstrap 1.50.1 abuild config check was not found once")
     source.write_text(text.replace(OLD, NEW, 1))
     progress_source.write_text(progress.replace(OLD_PROGRESS, NEW_PROGRESS, 1))
+    abuild_source.write_text(abuild.replace(OLD_ABUILD, NEW_ABUILD, 1))
 
 
 if __name__ == "__main__":
