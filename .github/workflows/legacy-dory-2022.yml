@@ -17,6 +17,7 @@ on:
       - 'scripts/prepare_legacy_device.py'
       - 'scripts/patch_legacy_pmbootstrap.py'
       - 'scripts/resolve_legacy_musl.py'
+      - 'scripts/patch_legacy_gcc.py'
 
 permissions:
   contents: read
@@ -117,6 +118,12 @@ jobs:
             --keys-dir "$PMB_WORK/config_apk_keys"
           git -C "$PMB_APORTS" diff -- cross/musl-armhf \
             > "$PMB_OUT/report/musl-source.patch"
+      - name: Adapt GCC 6 to modern compiler warnings
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_legacy_gcc.py "$PMB_APORTS"
+          git -C "$PMB_APORTS" diff -- cross/gcc6-armhf \
+            > "$PMB_OUT/report/gcc6-compat.patch"
       - name: Build kernel and device packages
         run: |
           set -euo pipefail
