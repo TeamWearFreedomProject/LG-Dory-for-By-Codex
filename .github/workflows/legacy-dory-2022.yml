@@ -18,6 +18,7 @@ on:
       - 'scripts/patch_legacy_pmbootstrap.py'
       - 'scripts/resolve_legacy_musl.py'
       - 'scripts/patch_legacy_gcc.py'
+      - 'scripts/patch_legacy_kernel.py'
 
 permissions:
   contents: read
@@ -124,6 +125,14 @@ jobs:
           python3 scripts/patch_legacy_gcc.py "$PMB_APORTS"
           git -C "$PMB_APORTS" diff -- cross/gcc6-armhf \
             > "$PMB_OUT/report/gcc6-compat.patch"
+      - name: Adapt kernel assembly to modern binutils
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_legacy_kernel.py "$PMB_APORTS"
+          git -C "$PMB_APORTS" diff -- device/testing/linux-lg-dory \
+            > "$PMB_OUT/report/kernel-compat.patch"
+          cp "$PMB_APORTS/device/testing/linux-lg-dory/binutils-modern-arm-section-flags.patch" \
+            "$PMB_OUT/report/"
       - name: Build kernel and device packages
         run: |
           set -euo pipefail
