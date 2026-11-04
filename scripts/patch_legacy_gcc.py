@@ -36,6 +36,16 @@ def patch(root: Path) -> None:
                               'depends="binutils-armhf mpc1 libstdc++"', 1)
     path.write_text(updated)
 
+    modern_path = root / "cross/gcc-armhf/APKBUILD"
+    modern = modern_path.read_text()
+    if modern.count(marker) != 2 or "_pkgsnap=20220924" not in modern:
+        raise ValueError("Unexpected pinned gcc-armhf APKBUILD layout")
+    modern = modern.replace(
+        marker,
+        marker + '\n\texport CXXFLAGS="$CXXFLAGS -Wno-error=format-security"',
+    )
+    modern_path.write_text(modern)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

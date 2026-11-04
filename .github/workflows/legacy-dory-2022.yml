@@ -119,12 +119,12 @@ jobs:
             --keys-dir "$PMB_WORK/config_apk_keys"
           git -C "$PMB_APORTS" diff -- cross/musl-armhf \
             > "$PMB_OUT/report/musl-source.patch"
-      - name: Adapt GCC 6 to modern compiler warnings
+      - name: Adapt cross compilers to modern build tooling
         run: |
           set -euo pipefail
           python3 scripts/patch_legacy_gcc.py "$PMB_APORTS"
-          git -C "$PMB_APORTS" diff -- cross/gcc6-armhf \
-            > "$PMB_OUT/report/gcc6-compat.patch"
+          git -C "$PMB_APORTS" diff -- cross/gcc6-armhf cross/gcc-armhf \
+            > "$PMB_OUT/report/gcc-compat.patch"
       - name: Adapt kernel assembly to modern binutils
         run: |
           set -euo pipefail
