@@ -29,6 +29,14 @@ PATCH = """--- a/arch/arm/mm/proc-v7.S
  /*
   * sort out different calling conventions
   */
+--- a/arch/arm/boot/compressed/piggy.gzip.S
++++ b/arch/arm/boot/compressed/piggy.gzip.S
+@@ -1,4 +1,4 @@
+-\t.section .piggydata,#alloc
++\t.section .piggydata,"a",%progbits
+ \t.globl\tinput_data
+ input_data:
+ \t.incbin\t"arch/arm/boot/compressed/piggy.gzip"
 """
 
 
