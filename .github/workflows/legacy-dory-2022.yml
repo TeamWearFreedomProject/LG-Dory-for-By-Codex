@@ -78,12 +78,6 @@ jobs:
             > "$PMB_OUT/report/device-changes.patch"
           printf 'usb_product_id=%s\n' "$USB_PRODUCT_ID" \
             > "$PMB_OUT/report/build-options.txt"
-      - name: Resolve archived Alpine ARMHF musl packages
-        run: |
-          set -euo pipefail
-          python3 scripts/resolve_legacy_musl.py "$PMB_APORTS"
-          git -C "$PMB_APORTS" diff -- cross/musl-armhf \
-            > "$PMB_OUT/report/musl-source.patch"
       - name: Configure pmbootstrap
         run: |
           set -euo pipefail
@@ -109,6 +103,21 @@ jobs:
           python3 "$PMB_PY" -c "$PMB_CFG" \
             --config-channels "$PMB_APORTS/channels.cfg" \
             deviceinfo_parse lg-dory
+      - name: Initialize signed Alpine package tooling
+        run: |
+          set -euo pipefail
+          python3 "$PMB_PY" -c "$PMB_CFG" \
+            --config-channels "$PMB_APORTS/channels.cfg" \
+            -y chroot --output stdout true
+      - name: Verify archived ARMHF musl packages
+        run: |
+          set -euo pipefail
+          python3 scripts/resolve_legacy_musl.py "$PMB_APORTS" \
+            --apk-static "$PMB_WORK/apk.static" \
+            --keys-dir "$PMB_WORK/config_apk_keys" \
+            --distfiles "$PMB_WORK/cache_distfiles"
+          git -C "$PMB_APORTS" diff -- cross/musl-armhf \
+            > "$PMB_OUT/report/musl-source.patch"
       - name: Build kernel and device packages
         run: |
           set -euo pipefail

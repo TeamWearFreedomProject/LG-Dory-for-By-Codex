@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""Find the original musl ARMHF APKs in an official Alpine stable archive.
+"""Use signed Alpine stable musl APKs in a disposable 2022 pmaports clone.
 
-Only the source URL in a disposable pmaports checkout changes. The SHA-512
-checksums from the pinned 2022 APKBUILD remain untouched and are checked by
-abuild after download.
+The old edge APKs have disappeared. A stable APK of the same version is a
+different artifact, so record its digest only after apk.static verifies its
+signature and contents with trusted Alpine keys.
 """
 
 import argparse
+import hashlib
+import re
+import shutil
+import subprocess
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
-
 
 MIRROR = "https://dl-cdn.alpinelinux.org/alpine"
 BRANCHES = ("v3.17", "v3.16", "v3.18")
@@ -21,30 +25,69 @@ NEW_MIRROR = f'_mirror="{MIRROR}"'
 OLD_PATH = "::$_mirror/edge/main/$_arch/"
 
 
+def package_url(branch: str, package: str) -> str:
+    return f"{MIRROR}/{branch}/main/armhf/{package}-{VERSION}.apk"
+
+
 def available(branch: str, package: str) -> bool:
-    url = f"{MIRROR}/{branch}/main/armhf/{package}-{VERSION}.apk"
-    request = urllib.request.Request(url, method="HEAD")
+    request = urllib.request.Request(package_url(branch, package), method="HEAD")
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
             return response.status == 200
     except (urllib.error.HTTPError, urllib.error.URLError) as error:
-        print(f"Unavailable: {url} ({error})")
+        print(f"Unavailable: {package_url(branch, package)} ({error})")
         return False
 
 
-def resolve(root: Path) -> str:
+def update_checksum(source: str, alias: str, digest: str) -> str:
+    pattern = rf"(?m)^[0-9a-f]{{128}}(  {re.escape(alias)})$"
+    updated, count = re.subn(pattern, lambda match: digest + match.group(1), source)
+    if count != 1:
+        raise ValueError(f"Expected exactly one checksum for {alias}")
+    return updated
+
+
+def resolve(root: Path, apk_static: Path, keys_dir: Path, distfiles: Path) -> str:
     path = root / "cross/musl-armhf/APKBUILD"
     source = path.read_text()
     if source.count(OLD_MIRROR) != 1 or source.count(OLD_PATH) != 2:
         raise ValueError("Unexpected pinned musl-armhf source layout")
     if "pkgver=1.2.3\npkgrel=4\n" not in source:
         raise ValueError("Unexpected pinned musl-armhf package version")
+    if not apk_static.is_file() or not list(keys_dir.glob("*.pub")):
+        raise ValueError("Verified apk.static and Alpine public keys are required")
+
     for branch in BRANCHES:
-        if all(available(branch, package) for package in PACKAGES):
+        if not all(available(branch, package) for package in PACKAGES):
+            continue
+        with tempfile.TemporaryDirectory() as temporary:
+            paths = {}
+            for package in PACKAGES:
+                alias = f"{package}-{VERSION}-armhf-edge.apk"
+                target = Path(temporary) / alias
+                with urllib.request.urlopen(package_url(branch, package), timeout=60) as response:
+                    with target.open("wb") as output:
+                        shutil.copyfileobj(response, output)
+                paths[alias] = target
+
+            # apk verify checks package signature and contents. Do not alter
+            # expected digests or reuse downloads if this command fails.
+            subprocess.run(
+                [str(apk_static), "--keys-dir", str(keys_dir), "verify",
+                 *(str(p) for p in paths.values())],
+                check=True,
+            )
             updated = source.replace(OLD_MIRROR, NEW_MIRROR, 1)
             updated = updated.replace(OLD_PATH, f"::$_mirror/{branch}/main/$_arch/")
+            for alias, target in paths.items():
+                digest = hashlib.sha512(target.read_bytes()).hexdigest()
+                updated = update_checksum(updated, alias, digest)
+
+            distfiles.mkdir(parents=True, exist_ok=True)
+            for alias, target in paths.items():
+                shutil.copy2(target, distfiles / alias)
             path.write_text(updated)
-            print(f"Using official Alpine {branch} musl ARMHF APKs; SHA-512 unchanged")
+            print(f"Verified signed Alpine {branch} musl ARMHF APKs; recorded SHA-512")
             return branch
     raise RuntimeError("The pinned musl and musl-dev ARMHF APKs were not found")
 
@@ -52,4 +95,8 @@ def resolve(root: Path) -> str:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("pmaports", type=Path)
-    resolve(parser.parse_args().pmaports)
+    parser.add_argument("--apk-static", type=Path, required=True)
+    parser.add_argument("--keys-dir", type=Path, required=True)
+    parser.add_argument("--distfiles", type=Path, required=True)
+    args = parser.parse_args()
+    resolve(args.pmaports, args.apk_static, args.keys_dir, args.distfiles)
