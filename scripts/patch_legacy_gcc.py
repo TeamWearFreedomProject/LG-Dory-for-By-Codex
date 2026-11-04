@@ -40,10 +40,15 @@ def patch(root: Path) -> None:
     modern = modern_path.read_text()
     if modern.count(marker) != 2 or "_pkgsnap=20220924" not in modern:
         raise ValueError("Unexpected pinned gcc-armhf APKBUILD layout")
+    if modern.count('options="!strip"') != 1 or modern.count('depends="binutils-armhf mpc1"') != 1:
+        raise ValueError("Unexpected pinned GCC 12 package dependencies")
     modern = modern.replace(
         marker,
         marker + '\n\texport CXXFLAGS="$CXXFLAGS -Wno-error=format-security"',
     )
+    modern = modern.replace('options="!strip"', 'options="!strip !tracedeps"', 1)
+    modern = modern.replace('depends="binutils-armhf mpc1"',
+                            'depends="binutils-armhf mpc1 libstdc++"', 1)
     modern_path.write_text(modern)
 
 
