@@ -15,6 +15,7 @@ on:
     paths:
       - '.github/workflows/legacy-dory-2022.yml'
       - 'scripts/prepare_legacy_device.py'
+      - 'scripts/patch_legacy_pmbootstrap.py'
 
 permissions:
   contents: read
@@ -58,6 +59,12 @@ jobs:
             "$(git -C pmaports rev-parse HEAD)" \
             > "$PMB_OUT/report/upstream-revisions.txt"
           python3 "$PMB_PY" --version
+      - name: Preserve apk.static version verification with apk 3
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_legacy_pmbootstrap.py pmbootstrap
+          git -C pmbootstrap diff -- pmb/chroot/apk_static.py \
+            > "$PMB_OUT/report/pmbootstrap-compat.patch"
       - name: Set test USB product ID
         env:
           USB_PRODUCT_ID: ${{ inputs.usb_product_id || '0x4EE3' }}

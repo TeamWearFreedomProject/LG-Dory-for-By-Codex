@@ -1,7 +1,9 @@
 # LG G Watch (dory) postmarketOS experiments
 
 The [2022 ARMHF build workflow](.github/workflows/legacy-dory-2022.yml) uses
-pinned postmarketOS sources from December 2022. It keeps the original dory
+pinned postmarketOS sources from December 2022. It applies a narrow
+apk 3 version-output compatibility fix to pmbootstrap while retaining its
+package-signature and version checks. It keeps the original dory
 Linux 3.10/GCC 6 port and builds a minimal image with SSH enabled. GitHub
 Actions uploads compressed `boot.img` and `lg-dory.img` plus logs and checksums.
 The build checks the Android boot header and the watch's 22 MiB boot limit.
