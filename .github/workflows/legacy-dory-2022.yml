@@ -1,0 +1,147 @@
+name: LG G Watch 2022 ARMHF image
+
+on:
+  workflow_dispatch:
+    inputs:
+      usb_product_id:
+        description: 'D001 = original; 4EE3 = Windows matching experiment'
+        required: true
+        type: choice
+        default: '0x4EE3'
+        options:
+          - '0x4EE3'
+          - '0xD001'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 330
+    env:
+      PMB_WORK: ${{ github.workspace }}/.pmbootstrap-work
+      PMB_APORTS: ${{ github.workspace }}/pmaports
+      PMB_CFG: ${{ github.workspace }}/pmbootstrap.cfg
+      PMB_OUT: ${{ github.workspace }}/out
+      PMB_PY: ${{ github.workspace }}/pmbootstrap/pmbootstrap.py
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3 git openssl \
+            qemu-user-static binfmt-support kpartx util-linux e2fsprogs \
+            parted rsync file zstd xz-utils ca-certificates
+      - name: Fetch fixed 2022 source revisions
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch 1.50.1 \
+            https://gitlab.com/postmarketOS/pmbootstrap.git pmbootstrap
+          test "$(git -C pmbootstrap rev-parse HEAD)" = \
+            9d93d34b65363ec6bb32b6345ec9ed685e5f9602
+          git init pmaports
+          git -C pmaports remote add origin \
+            https://gitlab.com/postmarketOS/pmaports.git
+          git -C pmaports fetch --depth 1 origin \
+            e07103fb745821390a7640460f091f842d9e08ae
+          git -C pmaports switch -c master FETCH_HEAD
+          test "$(git -C pmaports rev-parse HEAD)" = \
+            e07103fb745821390a7640460f091f842d9e08ae
+          mkdir -p "$PMB_OUT/report"
+          printf 'pmbootstrap=%s\npmaports=%s\n' \
+            "$(git -C pmbootstrap rev-parse HEAD)" \
+            "$(git -C pmaports rev-parse HEAD)" \
+            > "$PMB_OUT/report/upstream-revisions.txt"
+          python3 "$PMB_PY" --version
+      - name: Set test USB product ID
+        env:
+          USB_PRODUCT_ID: ${{ inputs.usb_product_id }}
+        run: |
+          set -euo pipefail
+          python3 scripts/prepare_legacy_device.py "$PMB_APORTS" \
+            --product-id "$USB_PRODUCT_ID"
+          git -C "$PMB_APORTS" diff -- \
+            device/testing/device-lg-dory \
+            > "$PMB_OUT/report/device-changes.patch"
+          printf 'usb_product_id=%s\n' "$USB_PRODUCT_ID" \
+            > "$PMB_OUT/report/build-options.txt"
+      - name: Configure pmbootstrap
+        run: |
+          set -euo pipefail
+          mkdir -p "$PMB_WORK/cache_git"
+          printf '6\n' > "$PMB_WORK/version"
+          python3 - <<'PY'
+          import configparser
+          import os
+          cfg = configparser.ConfigParser()
+          cfg['pmbootstrap'] = {
+              'aports': os.environ['PMB_APORTS'],
+              'work': os.environ['PMB_WORK'],
+              'device': 'lg-dory',
+              'ui': 'none',
+              'user': 'dory',
+              'hostname': 'dory',
+              'is_default_channel': 'True',
+              'extra_space': '0',
+          }
+          with open(os.environ['PMB_CFG'], 'w', encoding='utf-8') as f:
+              cfg.write(f)
+          PY
+          python3 "$PMB_PY" -c "$PMB_CFG" \
+            --config-channels "$PMB_APORTS/channels.cfg" \
+            deviceinfo_parse lg-dory
+      - name: Build kernel and device packages
+        run: |
+          set -euo pipefail
+          python3 "$PMB_PY" -c "$PMB_CFG" \
+            --config-channels "$PMB_APORTS/channels.cfg" \
+            -y -t 3600 --details-to-stdout build --arch armhf \
+            linux-lg-dory device-lg-dory \
+            2>&1 | tee "$PMB_OUT/report/packages.log"
+      - name: Build image with SSH enabled
+        run: |
+          set -euo pipefail
+          python3 "$PMB_PY" -c "$PMB_CFG" \
+            --config-channels "$PMB_APORTS/channels.cfg" \
+            -y -t 3600 --details-to-stdout install \
+            --password ci-test-only --filesystem ext4 \
+            2>&1 | tee "$PMB_OUT/report/install.log"
+      - name: Export and check images
+        run: |
+          set -euo pipefail
+          mkdir -p "$PMB_OUT/raw" "$PMB_OUT/packages"
+          python3 "$PMB_PY" -c "$PMB_CFG" \
+            --config-channels "$PMB_APORTS/channels.cfg" \
+            -y --details-to-stdout export "$PMB_OUT/raw" \
+            2>&1 | tee "$PMB_OUT/report/export.log"
+          for name in boot.img lg-dory.img; do
+            image="$PMB_OUT/raw/$name"
+            test -s "$image"
+            sha256sum "$image" >> "$PMB_OUT/report/SHA256SUMS-original.txt"
+            zstd -T0 -6 -c < "$image" > "$PMB_OUT/packages/$name.zst"
+          done
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          boot = Path(os.environ['PMB_OUT']) / 'raw/boot.img'
+          assert boot.open('rb').read(8) == b'ANDROID!'
+          assert boot.stat().st_size <= 23068672, 'boot image exceeds 22 MiB'
+          PY
+      - name: Keep diagnostic logs
+        if: always()
+        run: |
+          mkdir -p "$PMB_OUT/report"
+          if [ -f "$PMB_WORK/log.txt" ]; then
+            cp "$PMB_WORK/log.txt" "$PMB_OUT/report/pmbootstrap.log"
+          fi
+      - name: Upload images and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lg-dory-2022-${{ github.run_number }}-${{ inputs.usb_product_id }}
+          path: |
+            out/packages/
+            out/report/
+          if-no-files-found: error
+          retention-days: 30
