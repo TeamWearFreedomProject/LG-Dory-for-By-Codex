@@ -8,6 +8,7 @@ signature and contents with trusted Alpine keys.
 
 import argparse
 import hashlib
+import os
 import re
 import shutil
 import subprocess
@@ -54,8 +55,10 @@ def resolve(root: Path, apk_static: Path, keys_dir: Path, distfiles: Path) -> st
         raise ValueError("Unexpected pinned musl-armhf source layout")
     if "pkgver=1.2.3\npkgrel=4\n" not in source:
         raise ValueError("Unexpected pinned musl-armhf package version")
-    if not apk_static.is_file() or not list(keys_dir.glob("*.pub")):
-        raise ValueError("Verified apk.static and Alpine public keys are required")
+    if not apk_static.is_file():
+        raise ValueError("APK_STATIC_MISSING")
+    if not list(keys_dir.glob("*.pub")):
+        raise ValueError("ALPINE_KEYS_MISSING")
 
     for branch in BRANCHES:
         if not all(available(branch, package) for package in PACKAGES):
@@ -72,11 +75,18 @@ def resolve(root: Path, apk_static: Path, keys_dir: Path, distfiles: Path) -> st
 
             # apk verify checks package signature and contents. Do not alter
             # expected digests or reuse downloads if this command fails.
-            subprocess.run(
+            result = subprocess.run(
                 [str(apk_static), "--keys-dir", str(keys_dir), "verify",
                  *(str(p) for p in paths.values())],
-                check=True,
+                capture_output=True, text=True,
             )
+            if result.returncode:
+                output = (result.stdout + result.stderr).lower()
+                if "untrusted signature" in output or "untrusted" in output:
+                    raise RuntimeError("APK_SIGNATURE_UNTRUSTED")
+                if "unknown option" in output or "unknown command" in output:
+                    raise RuntimeError("APK_VERIFY_COMMAND_UNSUPPORTED")
+                raise RuntimeError("APK_VERIFY_FAILED")
             updated = source.replace(OLD_MIRROR, NEW_MIRROR, 1)
             updated = updated.replace(OLD_PATH, f"::$_mirror/{branch}/main/$_arch/")
             for alias, target in paths.items():
@@ -99,4 +109,10 @@ if __name__ == "__main__":
     parser.add_argument("--keys-dir", type=Path, required=True)
     parser.add_argument("--distfiles", type=Path, required=True)
     args = parser.parse_args()
-    resolve(args.pmaports, args.apk_static, args.keys_dir, args.distfiles)
+    try:
+        resolve(args.pmaports, args.apk_static, args.keys_dir, args.distfiles)
+    except (ValueError, RuntimeError, urllib.error.URLError) as error:
+        code = str(error) if isinstance(error, (ValueError, RuntimeError)) else "DOWNLOAD_FAILED"
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            print(f"::error title=Legacy musl preparation::{code}", flush=True)
+        raise

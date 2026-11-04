@@ -112,6 +112,8 @@ jobs:
       - name: Verify archived ARMHF musl packages
         run: |
           set -euo pipefail
+          test -x "$PMB_WORK/apk.static"
+          test -n "$(find "$PMB_WORK/config_apk_keys" -maxdepth 1 -name '*.pub' -print -quit)"
           python3 scripts/resolve_legacy_musl.py "$PMB_APORTS" \
             --apk-static "$PMB_WORK/apk.static" \
             --keys-dir "$PMB_WORK/config_apk_keys" \
