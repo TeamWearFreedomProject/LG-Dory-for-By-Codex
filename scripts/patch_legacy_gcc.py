@@ -11,6 +11,10 @@ def patch(root: Path) -> None:
     marker = 'export CXXFLAGS="$CPPFLAGS $CXXFLAGS"'
     if original.count(marker) != 2:
         raise ValueError("Unexpected pinned gcc6-armhf APKBUILD layout")
+    dependency = " isl-dev "
+    graphite = "\t\t--enable-cloog-backend \\\n"
+    if original.count(dependency) != 1 or original.count(graphite) != 1:
+        raise ValueError("Unexpected pinned GCC 6 graphite configuration")
     # Modern Alpine enables -Werror=format-security. GCC 6's libcpp/expr.c
     # passes a variable warning message as a format string, so preserve the
     # warning but do not fail the build for this legacy compiler package.
@@ -18,6 +22,10 @@ def patch(root: Path) -> None:
         marker,
         marker + '\n\texport CXXFLAGS="$CXXFLAGS -Wno-error=format-security"',
     )
+    # The current isl-dev is 0.26, whose API no longer matches GCC 6's
+    # Graphite code. Graphite is an optional loop optimization for GCC.
+    updated = updated.replace(dependency, " ", 1)
+    updated = updated.replace(graphite, "\t\t--without-isl \\\n", 1)
     path.write_text(updated)
 
 
