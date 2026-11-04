@@ -57,6 +57,8 @@ def resolve(root: Path, apk_static: Path, keys_dir: Path, distfiles: Path) -> st
         raise ValueError("Unexpected pinned musl-armhf package version")
     if not apk_static.is_file():
         raise ValueError("APK_STATIC_MISSING")
+    if not os.access(apk_static, os.X_OK):
+        raise ValueError("APK_STATIC_NOT_EXECUTABLE")
     if not list(keys_dir.glob("*.pub")):
         raise ValueError("ALPINE_KEYS_MISSING")
 
