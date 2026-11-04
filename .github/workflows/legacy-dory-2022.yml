@@ -114,8 +114,7 @@ jobs:
           set -euo pipefail
           python3 scripts/resolve_legacy_musl.py "$PMB_APORTS" \
             --apk-static "$PMB_WORK/apk.static" \
-            --keys-dir "$PMB_WORK/config_apk_keys" \
-            --distfiles "$PMB_WORK/cache_distfiles"
+            --keys-dir "$PMB_WORK/config_apk_keys"
           git -C "$PMB_APORTS" diff -- cross/musl-armhf \
             > "$PMB_OUT/report/musl-source.patch"
       - name: Build kernel and device packages

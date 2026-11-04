@@ -48,7 +48,7 @@ def update_checksum(source: str, alias: str, digest: str) -> str:
     return updated
 
 
-def resolve(root: Path, apk_static: Path, keys_dir: Path, distfiles: Path) -> str:
+def resolve(root: Path, apk_static: Path, keys_dir: Path) -> str:
     path = root / "cross/musl-armhf/APKBUILD"
     source = path.read_text()
     if source.count(OLD_MIRROR) != 1 or source.count(OLD_PATH) != 2:
@@ -95,9 +95,6 @@ def resolve(root: Path, apk_static: Path, keys_dir: Path, distfiles: Path) -> st
                 digest = hashlib.sha512(target.read_bytes()).hexdigest()
                 updated = update_checksum(updated, alias, digest)
 
-            distfiles.mkdir(parents=True, exist_ok=True)
-            for alias, target in paths.items():
-                shutil.copy2(target, distfiles / alias)
             path.write_text(updated)
             print(f"Verified signed Alpine {branch} musl ARMHF APKs; recorded SHA-512")
             return branch
@@ -109,10 +106,9 @@ if __name__ == "__main__":
     parser.add_argument("pmaports", type=Path)
     parser.add_argument("--apk-static", type=Path, required=True)
     parser.add_argument("--keys-dir", type=Path, required=True)
-    parser.add_argument("--distfiles", type=Path, required=True)
     args = parser.parse_args()
     try:
-        resolve(args.pmaports, args.apk_static, args.keys_dir, args.distfiles)
+        resolve(args.pmaports, args.apk_static, args.keys_dir)
     except (ValueError, RuntimeError, urllib.error.URLError) as error:
         code = str(error) if isinstance(error, (ValueError, RuntimeError)) else "DOWNLOAD_FAILED"
         if os.environ.get("GITHUB_ACTIONS") == "true":
