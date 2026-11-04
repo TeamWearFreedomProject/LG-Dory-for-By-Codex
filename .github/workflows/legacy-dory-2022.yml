@@ -16,6 +16,7 @@ on:
       - '.github/workflows/legacy-dory-2022.yml'
       - 'scripts/prepare_legacy_device.py'
       - 'scripts/patch_legacy_pmbootstrap.py'
+      - 'scripts/resolve_legacy_musl.py'
 
 permissions:
   contents: read
@@ -77,6 +78,12 @@ jobs:
             > "$PMB_OUT/report/device-changes.patch"
           printf 'usb_product_id=%s\n' "$USB_PRODUCT_ID" \
             > "$PMB_OUT/report/build-options.txt"
+      - name: Resolve archived Alpine ARMHF musl packages
+        run: |
+          set -euo pipefail
+          python3 scripts/resolve_legacy_musl.py "$PMB_APORTS"
+          git -C "$PMB_APORTS" diff -- cross/musl-armhf \
+            > "$PMB_OUT/report/musl-source.patch"
       - name: Configure pmbootstrap
         run: |
           set -euo pipefail
