@@ -59,11 +59,11 @@ jobs:
             "$(git -C pmaports rev-parse HEAD)" \
             > "$PMB_OUT/report/upstream-revisions.txt"
           python3 "$PMB_PY" --version
-      - name: Preserve apk.static version verification with apk 3
+      - name: Adapt pmbootstrap to apk 3 output
         run: |
           set -euo pipefail
           python3 scripts/patch_legacy_pmbootstrap.py pmbootstrap
-          git -C pmbootstrap diff -- pmb/chroot/apk_static.py \
+          git -C pmbootstrap diff -- pmb/chroot/apk_static.py pmb/helpers/apk.py \
             > "$PMB_OUT/report/pmbootstrap-compat.patch"
       - name: Set test USB product ID
         env:
