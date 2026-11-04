@@ -18,6 +18,17 @@ PATCH = """--- a/arch/arm/mm/proc-v7.S
  
  \t/*
  \t * Standard v7 proc info content
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -114,7 +114,7 @@
+ #endif
+ \t\t.endm
+\x20
+-\t\t.section ".start", #alloc, #execinstr
++\t\t.section ".start", "ax", %progbits
+ /*
+  * sort out different calling conventions
+  */
 """
 
 
