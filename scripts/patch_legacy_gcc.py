@@ -15,6 +15,8 @@ def patch(root: Path) -> None:
     graphite = "\t\t--enable-cloog-backend \\\n"
     if original.count(dependency) != 1 or original.count(graphite) != 1:
         raise ValueError("Unexpected pinned GCC 6 graphite configuration")
+    if original.count('options="!strip"') != 2 or original.count('depends="binutils-armhf mpc1"') != 1:
+        raise ValueError("Unexpected pinned GCC 6 package dependencies")
     # Modern Alpine enables -Werror=format-security. GCC 6's libcpp/expr.c
     # passes a variable warning message as a format string, so preserve the
     # warning but do not fail the build for this legacy compiler package.
@@ -26,6 +28,12 @@ def patch(root: Path) -> None:
     # Graphite code. Graphite is an optional loop optimization for GCC.
     updated = updated.replace(dependency, " ", 1)
     updated = updated.replace(graphite, "\t\t--without-isl \\\n", 1)
+    # abuild 3.18 attempts to resolve the ARMHF ELF interpreter of target
+    # files inside this x86_64 cross-compiler package. Keep explicit host
+    # runtime dependencies instead of tracing those target ELF files.
+    updated = updated.replace('options="!strip"', 'options="!strip !tracedeps"')
+    updated = updated.replace('depends="binutils-armhf mpc1"',
+                              'depends="binutils-armhf mpc1 libstdc++"', 1)
     path.write_text(updated)
 
 
