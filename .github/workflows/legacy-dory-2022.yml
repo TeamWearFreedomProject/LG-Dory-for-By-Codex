@@ -124,7 +124,7 @@ jobs:
           python3 "$PMB_PY" -c "$PMB_CFG" \
             --config-channels "$PMB_APORTS/channels.cfg" \
             -y chroot --suffix buildroot_armhf --add pigz \
-            --output stdout sh -c 'command -v pigz'
+            --output stdout which pigz
       - name: Verify archived ARMHF musl packages
         run: |
           set -euo pipefail
