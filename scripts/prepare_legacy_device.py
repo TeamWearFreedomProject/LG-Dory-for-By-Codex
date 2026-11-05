@@ -25,6 +25,18 @@ def prepare(root: Path, product_id: str) -> None:
         1,
     )
     apk = apk_path.read_text()
+    package_tail = '\t\t"$srcdir"/90-touchscreen-dev.rules\n}'
+    if apk.count(package_tail) != 1:
+        raise ValueError("Unexpected 2022 device package layout")
+    # The current mkinitfs includes /usr/sbin/losetup, while Alpine's
+    # losetup package in this mixed 2022/current build installs /sbin/losetup.
+    apk = apk.replace(
+        package_tail,
+        '\t\t"$srcdir"/90-touchscreen-dev.rules\n'
+        '\tinstall -d "$pkgdir/usr/sbin"\n'
+        '\tln -s /sbin/losetup "$pkgdir/usr/sbin/losetup"\n}',
+        1,
+    )
     checksum = hashlib.sha512(updated.encode()).hexdigest()
     apk, count = re.subn(
         r"[0-9a-f]{128}(  deviceinfo\s*)",
