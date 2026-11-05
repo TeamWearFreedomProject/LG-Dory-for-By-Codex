@@ -19,6 +19,7 @@ on:
       - 'scripts/resolve_legacy_musl.py'
       - 'scripts/patch_legacy_gcc.py'
       - 'scripts/patch_legacy_kernel.py'
+      - 'scripts/patch_legacy_splash.py'
 
 permissions:
   contents: read
@@ -133,6 +134,12 @@ jobs:
             > "$PMB_OUT/report/kernel-compat.patch"
           cp "$PMB_APORTS/device/testing/linux-lg-dory/binutils-modern-arm-section-flags.patch" \
             "$PMB_OUT/report/"
+      - name: Adapt ARMHF splash source unpack
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_legacy_splash.py "$PMB_APORTS"
+          git -C "$PMB_APORTS" diff -- main/postmarketos-splash \
+            > "$PMB_OUT/report/splash-compat.patch"
       - name: Build kernel and device packages
         run: |
           set -euo pipefail
