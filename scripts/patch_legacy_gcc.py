@@ -42,6 +42,9 @@ def patch(root: Path) -> None:
         raise ValueError("Unexpected pinned gcc-armhf APKBUILD layout")
     if modern.count('options="!strip"') != 1 or modern.count('depends="binutils-armhf mpc1"') != 1:
         raise ValueError("Unexpected pinned GCC 12 package dependencies")
+    gpp_host_dependency = 'depends="libstdc++=$_gccrel libstdc++-dev$_target=$_gccrel gcc$_target=$_gccrel libc-dev"'
+    if modern.count(gpp_host_dependency) != 1:
+        raise ValueError("Unexpected pinned g++-armhf host dependency")
     modern = modern.replace(
         marker,
         marker + '\n\texport CXXFLAGS="$CXXFLAGS -Wno-error=format-security"',
@@ -49,6 +52,11 @@ def patch(root: Path) -> None:
     modern = modern.replace('options="!strip"', 'options="!strip !tracedeps"', 1)
     modern = modern.replace('depends="binutils-armhf mpc1"',
                             'depends="binutils-armhf mpc1 libstdc++"', 1)
+    # The host libstdc++ stays ABI-compatible across GCC versions. Only the
+    # target ARMHF development files and cross compiler must match GCC 12.
+    modern = modern.replace(gpp_host_dependency,
+                            gpp_host_dependency.replace('libstdc++=$_gccrel',
+                                                        'libstdc++'), 1)
     modern_path.write_text(modern)
 
 
