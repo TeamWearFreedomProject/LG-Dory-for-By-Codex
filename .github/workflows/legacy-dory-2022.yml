@@ -112,6 +112,12 @@ jobs:
           python3 "$PMB_PY" -c "$PMB_CFG" \
             --config-channels "$PMB_APORTS/channels.cfg" \
             -y chroot --output stdout true
+      - name: Install native compression helper for cross builds
+        run: |
+          set -euo pipefail
+          python3 "$PMB_PY" -c "$PMB_CFG" \
+            --config-channels "$PMB_APORTS/channels.cfg" \
+            -y chroot --add pigz --output stdout true
       - name: Verify archived ARMHF musl packages
         run: |
           set -euo pipefail
