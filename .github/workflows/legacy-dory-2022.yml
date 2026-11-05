@@ -118,6 +118,13 @@ jobs:
           python3 "$PMB_PY" -c "$PMB_CFG" \
             --config-channels "$PMB_APORTS/channels.cfg" \
             -y chroot --add pigz --output stdout true
+      - name: Install ARMHF compression helper for package creation
+        run: |
+          set -euo pipefail
+          python3 "$PMB_PY" -c "$PMB_CFG" \
+            --config-channels "$PMB_APORTS/channels.cfg" \
+            -y chroot --suffix buildroot_armhf --add pigz \
+            --output stdout sh -c 'command -v pigz'
       - name: Verify archived ARMHF musl packages
         run: |
           set -euo pipefail
