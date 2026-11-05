@@ -29,13 +29,19 @@ def prepare(root: Path, product_id: str) -> None:
     if apk.count(package_tail) != 1:
         raise ValueError("Unexpected 2022 device package layout")
     # The current mkinitfs includes /usr/sbin/losetup, while Alpine's
-    # losetup package in this mixed 2022/current build installs /sbin/losetup.
-    apk = apk.replace(
-        package_tail,
-        '\t\t"$srcdir"/90-touchscreen-dev.rules\n'
-        '\tinstall -d "$pkgdir/usr/sbin"\n'
-        '\tln -s /sbin/losetup "$pkgdir/usr/sbin/losetup"\n}',
-        1,
+    # losetup package installs /sbin/losetup. An APK-owned symlink conflicts
+    # with losetup's cmd:losetup provider, so create it at install time.
+    marker = 'options="!check !archcheck"'
+    if apk.count(marker) != 1:
+        raise ValueError("Unexpected 2022 device package options")
+    apk = apk.replace(marker, marker + '\ninstall="$pkgname.post-install"', 1)
+    post_install = device / "device-lg-dory.post-install"
+    if post_install.exists():
+        raise ValueError("Upstream already has a post-install script")
+    post_install.write_text(
+        '#!/bin/sh\n'
+        'mkdir -p /usr/sbin\n'
+        'ln -s /sbin/losetup /usr/sbin/losetup\n'
     )
     checksum = hashlib.sha512(updated.encode()).hexdigest()
     apk, count = re.subn(
